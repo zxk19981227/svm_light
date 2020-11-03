@@ -25,26 +25,27 @@ for dir in data_set:
                 bi={}
                 lines=f.readlines()
                 for line in lines:
-                    words=nltk.word_tokenize(line.strip())
+                    words=nltk.word_tokenize(line.strip().lower())
                     biword=find_ngrams(words,2)
                     for word in words:
+                        word=word.strip()
                         if word not in word_dict.keys():
                             word_dict[word]=len(word_dict.keys())+1
                     for bi in biword:
                         if bi not in bi_dict.keys():
-                            bi_dict[bi]=len(bi_dict.keys())
+                            bi_dict[bi]=len(bi_dict.keys())+1
         with open("glove.840B.300d.txt",'r',encoding='utf-8') as f:
             for line in tqdm(f):
                 info=line.strip().split(' ')
                 if (info[0] == 'unk') or info[0] in word_dict.keys() and (info[0] not in glove_dict.keys()):
                     glove_dict[info[0]]=[float(i) for i in info[1:]]
         for file in tqdm(file_list):
-            with open(current_dir+file,'r') as f: 
+            with open(current_dir+file,'r',encoding='utf-8') as f:
                 single={}
                 bigram={}
                 lines=f.readlines()
                 for line in lines:
-                    words=nltk.word_tokenize(line.strip())
+                    words=nltk.word_tokenize(line.strip().lower())
                     biword=find_ngrams(words,2)
                     for word in words:
                         if word not in single.keys():
@@ -89,9 +90,8 @@ for dir in data_set:
                 for j in range(300):
                     res.append("{}:{}".format(j+1,su[j]))
                 glove_file.write(' '.join(res))
-        sing_file.close()
-        glove_file.close()
-        bi_file.close()
+                glove_file.write('\n')
+
 
 
 

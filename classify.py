@@ -3,98 +3,86 @@ from tqdm import tqdm
 import nltk
 def find_ngrams(input_list, n):
   return zip(*[input_list[i:] for i in range(n)])
+train_data=fetch_20newsgroups(subset='train')
 news=fetch_20newsgroups(subset='test')
-set_name=list(news.target_names)
-set_dict={name:i for i,name in enumerate(set_name)}
 dataset=['./']
 word_dict={}
 bi_dict={}
-
-for data in tqdm(news.data):
-    sentences=nltk.sent_tokenize(data)
-    for sentence in sentences:
-        words=nltk.word_tokenize(sentence)
-        for word in words:
-            if word not in word_dict.keys():
-                word_dict[word]=len(word_dict.keys())+1
-        pairs=find_ngrams(words,2)
-        for pair in pairs:
-            if pair not in bi_dict.keys():
-                bi_dict[pair]=len(bi_dict.keys())+1
-with open("20newsword_dict.txt",'w',encoding='utf-8') as f:
-    for word in word_dict.keys():
-       f.write('{} {}\n'.format(word,word_dict[word]))
 glove_dict={}
-with open('glove.840B.300d.txt', 'r', encoding='utf-8') as f:
-    info = f.readline()
-    cou=0
-    while info !='':
-        infos = info.split(' ')
-        word = infos[0]
-        if word=='unk':
-            glove_dict[word]=infos[1:]
-        elif word in word_dict.keys():
-            glove_dict[word]=infos[1:]
-        cou+=1
-        info=f.readline()
-        # if cou%1000==0:
-        #     print(cou)
-        # print(word)
-with open('20newsglove_test.txt','w') as f:
-    for name,data in tqdm(zip(news.filenames,news.data)):
-        current_sum=[0]*300
-        cou=0
-        name=name.split('\\')[-2]
-        sentences = nltk.sent_tokenize(data)
-        for sentence in sentences:
-            words = nltk.word_tokenize(sentence)
+data_set=[train_data,news]
+file_path=['./learn/train/','./learn/test/']
+for data,path in zip(data_set,file_path):
+    bi_file=open(path+'bigram.txt','w',encoding='utf-8')
+    uni_file=open(path+'unigram.txt','w',encoding='utf-8')
+    glove_file=open(path+'glove.txt','w',encoding='utf-8')
+    labels=data.target
+    papers=data['data']
+    for paper,label in tqdm(zip(papers,labels)):
+        sentences=nltk.sent_tokenize(paper.lower())
+        for sen in sentences:
+            words=nltk.word_tokenize(sen)
             for word in words:
+                if word not in word_dict.keys():
+                    word_dict[word]=len(word_dict.keys())+1
+            bi_word=find_ngrams(words,2)
+            for bigr in bi_word:
+                if bigr not in bi_dict.keys():
+                    bi_dict[bigr]=len(bi_dict.keys())+1
+    with open('glove.840B.300d.txt','r',encoding='utf-8') as f:
+        for line in tqdm(f):
+            infos=line.strip().split(' ')
+            word=infos[0]
+            if word=='unk' and word not in word_dict.keys():
+                glove_dict[word]=[float(i) for i in infos[1:]]
+            elif word in word_dict.keys():
+                glove_dict[word] = [float(i) for i in infos[1:]]
+    for paper,label in tqdm(zip(papers,labels)):
+        sentences=nltk.sent_tokenize(paper.lower())
+        curr_bi={}
+        curr_un={}
+        current_value=[0]*300
+        word_num=0
+        for sen in sentences:
+            words=nltk.word_tokenize(sen)
+            bis=find_ngrams(words,2)
+            for word in words:
+                if word in curr_un.keys():
+                    curr_un[word]+=1
+                else:
+                    curr_un[word]=1
                 if word in glove_dict.keys():
-                    cur_word=word
+                    for i in range(300):
+                        current_value[i]+=glove_dict[word][i]
                 else:
-                    cur_word='unk'
-                for i in range(300):
-                    current_sum[i]+=float(glove_dict[cur_word][i])
-                    cou+=1
-        res=[str(set_dict[name]+1)]
+                    for i in range(300):
+                        current_value[i]+=glove_dict['unk'][i]
+                word_num+=1
+            for bi in bis:
+                if bi not in curr_bi.keys():
+                    curr_bi[bi]=1
+                else:
+                    curr_bi[bi]+=1
         for i in range(300):
-            current_sum[i]/=cou
-            res.append(" {}:{}".format(i+1,str(current_sum[i])))
-        f.write(' '.join(res))
-        f.write('\n')
-with open('20newsunigram_test.txt','w') as f:
-    for name,data in tqdm(zip(news.filenames,news.data)):
-        current_dict={}
-        name=name.split('\\')[-2]
-        sentences = nltk.sent_tokenize(data)
-        for sentence in sentences:
-            words = nltk.word_tokenize(sentence)
-            for word in words:
-                if word_dict[word] not in current_dict.keys():
-                    current_dict[word_dict[word]]=1
-                else:
-                    current_dict[word_dict[word]]+=1
-        res=[str(set_dict[name]+1)]
-        for key in sorted(current_dict.keys()):
-            res.append(" {}:{}".format(key,current_dict[key]))
-        f.write(' '.join(res))
-        f.write('\n')
-current_bi={}
-with open('20newsbigram_test.txt','w',encoding='utf-8') as f:
-    for name,data in tqdm(zip(news.filenames,news.data)):
-        current_bi={}
-        name=name.split('\\')[-2]
-        sentences = nltk.sent_tokenize(data)
-        for sentence in sentences:
-            words = nltk.word_tokenize(sentence)
-            res=find_ngrams(words,2)
-            for pars in res:
-                if pars not in current_bi.keys():
-                    current_bi[bi_dict[pars]]=1
-                else:
-                    current_bi[bi_dict[pars]]+=1
-        res=[str(set_dict[name]+1)]
-        for key in sorted(current_bi.keys()):
-            res.append(" {}:{}".format(key,current_bi[key]))
-        f.write(' '.join(res))
-        f.write('\n')
+            current_value[i]/=word_num
+        res=[str(label+1)]
+        res1=[str(label+1)]
+        for key in sorted(curr_un.keys()):
+            res1.append("{}:{}".format(word_dict[key],curr_un[key]))
+        uni_file.write(' '.join(res1))
+        uni_file.write('\n')
+        res1=[str(label+1)]
+        for key in sorted(curr_bi.keys()):
+            res1.append("{}:{}".format(bi_dict[key], curr_bi[key]))
+        bi_file.write(' '.join(res1))
+        bi_file.write('\n')
+        res=[str(label+1)]
+        for i in range(300):
+            res.append("{}:{}".format(i+1,current_value[i]))
+        glove_file.write(' '.join(res))
+        glove_file.write('\n')
+
+
+
+
+
+
